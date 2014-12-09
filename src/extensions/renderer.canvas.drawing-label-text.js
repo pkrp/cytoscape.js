@@ -133,8 +133,9 @@
 
   // set up canvas context with font
   // returns transformed text string
-  CanvasRenderer.prototype.setupTextStyle = function( context, element ){
+  CanvasRenderer.prototype.setupTextStyle = function( context, element, opts ){
     // Font style
+    var opts = opts || {};
     var parentOpacity = element.effectiveOpacity();
     var style = element._private.style;
     var labelStyle = style['font-style'].strValue;
@@ -149,7 +150,7 @@
     var fontCacheKey = element._private.fontKey;
     var cache = this.getFontCache(context);
 
-    if( cache.key !== fontCacheKey ){
+    if( cache.key !== fontCacheKey && !opts.skipStyleSetting ){
       context.font = labelStyle + ' ' + labelWeight + ' ' + labelSize + ' ' + labelFamily;
 
       cache.key = fontCacheKey;
@@ -167,34 +168,84 @@
     
     // Calculate text draw position based on text alignment
     
-    // so text outlines aren't jagged
-    context.lineJoin = 'round';
+    if( !opts.skipStyleSetting ){
 
-    this.fillStyle(context, color[0], color[1], color[2], opacity);
-    
-    this.strokeStyle(context, outlineColor[0], outlineColor[1], outlineColor[2], outlineOpacity);
+      // so text outlines aren't jagged
+      context.lineJoin = 'round';
+
+      this.fillStyle(context, color[0], color[1], color[2], opacity);
+      
+      this.strokeStyle(context, outlineColor[0], outlineColor[1], outlineColor[2], outlineOpacity);
+
+    }
 
     return text;
   };
 
   // Draw text
-  CanvasRenderer.prototype.drawText = function(context, element, textX, textY) {
-    var style = element._private.style;
+  CanvasRenderer.prototype.drawText = function( context, element, textX, textY ){
+    var r = this;
+    var ele = element;
+    var _p = ele._private;
+    var style = _p.style;
+    var rs = _p.rscratch;
     var parentOpacity = element.effectiveOpacity();
+    var cy = r.data.cy;
+
     if( parentOpacity === 0 ){ return; }
 
-    var text = this.setupTextStyle( context, element );
-    
+    var zoom = cy.zoom();
+    var pxRatio = this.getPixelRatio();
+    var cacheAlreadyExists = _p.labelTexture != null;
+    var cache = _p.labelTexture = _p.labelTexture || document.createElement('canvas');
+    var cacheCxt = _p.labelContext = _p.labelContext || cache.getContext('2d');
+    var cacheMiss = !cacheAlreadyExists || _p.lastLabelCacheKey !== _p.styleKey || r.labelsNeedRefresh;
+    var cacheHit = !cacheMiss;
+    var width = rs.labelWidth * zoom;
+    var height = rs.labelHeight * zoom;
+
+    if( !r.labelZoomDebounce ){
+      r.labelZoomDebounce = true;
+
+      cy.on( 'zoom', $$.util.debounce(function(){
+        r.labelsNeedRefresh = true;
+      }, { trailing: true }) );
+    }
+
+    if( cacheMiss ){
+      cache.width = width;
+      cache.height = height;
+
+      cache.style.width = width + 'px';
+      cache.style.height = height + 'px';
+
+      cacheCxt.clearRect( 0, 0, width, height );
+
+      console.log('miss');
+    } else {
+      console.log('hit');
+    }
+
+    var text = this.setupTextStyle( cacheCxt, element, { skipStyleSetting: false && cacheHit } );
+
     if ( text != null && !isNaN(textX) && !isNaN(textY) ) {
      
-      var lineWidth = 2  * style['text-outline-width'].value; // *2 b/c the stroke is drawn centred on the middle
-      if (lineWidth > 0) {
-        context.lineWidth = lineWidth;
-        context.strokeText(text, textX, textY);
+      if( cacheMiss ){
+        var lineWidth = 2  * style['text-outline-width'].value; // *2 b/c the stroke is drawn centred on the middle
+        
+        if( lineWidth > 0 ){
+          cacheCxt.lineWidth = lineWidth;
+          cacheCxt.strokeText( text, 0, height );
+        }
+
+        cacheCxt.fillText( text, 0, height );
       }
 
-      context.fillText(text, textX, textY);
+      context.drawImage( cache, textX, textY );
+
+      _p.lastLabelCacheKey = _p.styleKey;
     }
+
   };
 
   
