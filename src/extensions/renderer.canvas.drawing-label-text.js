@@ -205,9 +205,7 @@
     var height = rs.labelHeight * zoom;
 
     if( !r.labelZoomDebounce ){
-      r.labelZoomDebounce = true;
-
-      cy.on( 'zoom', $$.util.debounce(function(){
+      cy.on( 'zoom', r.labelZoomDebounce = $$.util.debounce(function(){
         r.labelsNeedRefresh = true;
       }, { trailing: true }) );
     }

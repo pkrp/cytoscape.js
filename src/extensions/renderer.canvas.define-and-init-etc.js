@@ -183,6 +183,10 @@
     if( this.removeObserver ){
       this.removeObserver.disconnect();
     }
+
+    if( this.labelZoomDebounce ){
+      this.data.cy.off( 'zoom', this.labelZoomDebounce );
+    }
   };
 
   
