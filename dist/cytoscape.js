@@ -20637,6 +20637,7 @@ var cytoscape;
     avoidOverlap: true, // prevents node overlap, may overflow boundingBox and radius if not enough space
     centralNode: undefined, // central node of the circle
     parentNode: undefined, // parent of central node
+    shiftCentral: false, // whether to push central node away from its parent
     radius: undefined, // the radius of the circle
     startAngle: 3/2 * Math.PI, // the position of the first node
     counterclockwise: false, // whether the layout should go counterclockwise (true) or clockwise (false)
@@ -20701,6 +20702,28 @@ var cytoscape;
           }
 
           if (options.centralNode) {
+              // change position of central node if needed
+              if (options.shiftCentral && options.parentNode) {
+                  var centralX = options.centralNode.position('x'),
+                      centralY = options.centralNode.position('y'),
+                      parentX = options.parentNode.position('x'),
+                      parentY = options.parentNode.position('y');
+
+                  var dx = ( centralX - parentX ),
+                      dy = ( centralY - parentY );
+
+                  var edgeLength = Math.sqrt(dx * dx + dy * dy),
+                      edgeToAdd = options.parentNode.width() * 1.75; // includes some spacing
+
+                  edgeToAdd += Math.max(0, r - edgeLength);
+
+                  var newPosition = {
+                      x: ( (edgeToAdd * dx) / edgeLength ) + dx + parentX,
+                      y: ( (edgeToAdd * dy) / edgeLength ) + dy + parentY
+                  };
+
+                  options.centralNode._private.position = newPosition;
+              }
               center = options.centralNode.position()
           }
           else center = {
