@@ -12037,7 +12037,7 @@ var cytoscape;
 
     // using standard layout options, apply position function (w/ or w/o animation)
     layoutPositions: function( layout, options, fn ){
-      var nodes = this.nodes();
+      var nodes = this.nodes().filter(':unlocked');
       var cy = this.cy();
 
       layout.trigger({ type: 'layoutstart', layout: layout });
@@ -20635,6 +20635,8 @@ var cytoscape;
     padding: 30, // the padding on fit
     boundingBox: undefined, // constrain layout bounds; { x1, y1, x2, y2 } or { x1, y1, w, h }
     avoidOverlap: true, // prevents node overlap, may overflow boundingBox and radius if not enough space
+    centralNode: undefined, // central node of the circle
+    parentNode: undefined, // parent of central node
     radius: undefined, // the radius of the circle
     startAngle: 3/2 * Math.PI, // the position of the first node
     counterclockwise: false, // whether the layout should go counterclockwise (true) or clockwise (false)
@@ -20648,74 +20650,85 @@ var cytoscape;
     this.options = $$.util.extend({}, defaults, options);
   }
   
-  CircleLayout.prototype.run = function(){
-    var params = this.options;
-    var options = params;
-    
-    var cy = params.cy;
-    var eles = options.eles;
-      
-    var nodes = eles.nodes().not(':parent');
-    
-    var bb = $$.util.makeBoundingBox( options.boundingBox ? options.boundingBox : {
-      x1: 0, y1: 0, w: cy.width(), h: cy.height()
-    } );
+  CircleLayout.prototype.run = function() {
+      var params = this.options;
+      var options = params;
 
-    var center = {
-      x: bb.x1 + bb.w/2,
-      y: bb.y1 + bb.h/2
-    };
-    
-    var theta = options.startAngle;
-    var dTheta = 2 * Math.PI / nodes.length;
-    var r;
+      var cy = params.cy;
+      var eles = options.eles;
 
-    var minDistance = 0;
-    for( var i = 0; i < nodes.length; i++ ){
-      var w = nodes[i].outerWidth();
-      var h = nodes[i].outerHeight();
-      
-      minDistance = Math.max(minDistance, w, h);
+      var nodes = eles.nodes().not(':parent').filter(':unlocked');
+      if (nodes.length > 0) {
+
+          var bb = $$.util.makeBoundingBox(options.boundingBox ? options.boundingBox : {
+              x1: 0, y1: 0, w: cy.width(), h: cy.height()
+          });
+
+          var center;
+
+          var theta = options.startAngle;
+          var dTheta = 2 * Math.PI / nodes.length;
+          var r;
+
+          var minDistance = 0;
+          for (var i = 0; i < nodes.length; i++) {
+              var w = nodes[i].outerWidth();
+              var h = nodes[i].outerHeight();
+
+              minDistance = Math.max(minDistance, w, h);
+          }
+
+          if ($$.is.number(options.radius)) {
+              r = options.radius;
+          } else if (nodes.length <= 1 && !options.centralNode) {
+              r = 0;
+          } else if (options.centralNode) {
+              r = nodes.length * minDistance * 0.75 / Math.PI; // includes some spacing
+              r = Math.max(minDistance * 2, r);
+          } else {
+              r = Math.min(bb.h, bb.w) / 2 - minDistance;
+          }
+
+          // calculate the radius
+          if (nodes.length > 1 && options.avoidOverlap) { // but only if more than one node (can't overlap)
+              minDistance *= 1.75; // just to have some nice spacing
+
+              var dTheta = 2 * Math.PI / nodes.length;
+              var dcos = Math.cos(dTheta) - Math.cos(0);
+              var dsin = Math.sin(dTheta) - Math.sin(0);
+              var rMin = Math.sqrt(minDistance * minDistance / ( dcos * dcos + dsin * dsin )); // s.t. no nodes overlapping
+              r = Math.max(rMin, r);
+          }
+
+          if (options.centralNode) {
+              center = options.centralNode.position()
+          }
+          else center = {
+              x: bb.x1 + bb.w / 2,
+              y: bb.y1 + bb.h / 2
+          };
+
+          var getPos = function (i, ele) {
+              var rx = r * Math.cos(theta);
+              var ry = r * Math.sin(theta);
+              var pos = {
+                  x: center.x + rx,
+                  y: center.y + ry
+              };
+
+              theta = options.counterclockwise ? theta - dTheta : theta + dTheta;
+              return pos;
+          };
+
+          nodes.layoutPositions(this, options, getPos);
+
+          return this; // chaining
+      }
     }
+    ;
 
-    if( $$.is.number(options.radius) ){
-      r = options.radius;
-    } else if( nodes.length <= 1 ){
-      r = 0;
-    } else {
-      r = Math.min( bb.h, bb.w )/2 - minDistance;
-    }
+    $$('layout', 'circle', CircleLayout);
 
-    // calculate the radius
-    if( nodes.length > 1 && options.avoidOverlap ){ // but only if more than one node (can't overlap)
-      minDistance *= 1.75; // just to have some nice spacing
-
-      var dTheta = 2 * Math.PI / nodes.length;
-      var dcos = Math.cos(dTheta) - Math.cos(0);
-      var dsin = Math.sin(dTheta) - Math.sin(0);
-      var rMin = Math.sqrt( minDistance * minDistance / ( dcos*dcos + dsin*dsin ) ); // s.t. no nodes overlapping
-      r = Math.max( rMin, r );
-    }
-
-    var getPos = function( i, ele ){
-      var rx = r * Math.cos( theta );
-      var ry = r * Math.sin( theta );
-      var pos = {
-        x: center.x + rx,
-        y: center.y + ry
-      };
-
-      theta = options.counterclockwise ? theta - dTheta : theta + dTheta;
-      return pos;
-    };
-    
-    nodes.layoutPositions( this, options, getPos );
-
-    return this; // chaining
-  };
-  
-  $$('layout', 'circle', CircleLayout);
-  
 })( cytoscape );
 
 ;(function($$){ 'use strict';
