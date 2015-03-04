@@ -20713,13 +20713,13 @@ var cytoscape;
                       dy = ( centralY - parentY );
 
                   var edgeLength = Math.sqrt(dx * dx + dy * dy),
-                      edgeToAdd = options.parentNode.width() * 1.75; // includes some spacing
+                      distanceToAdd = options.parentNode.width() * 1.75; // includes some spacing
 
-                  edgeToAdd += Math.max(0, r - edgeLength);
+                  distanceToAdd += Math.max(0, r - edgeLength);
 
                   var newPosition = {
-                      x: ( (edgeToAdd * dx) / edgeLength ) + dx + parentX,
-                      y: ( (edgeToAdd * dy) / edgeLength ) + dy + parentY
+                      x: ( (distanceToAdd * dx) / edgeLength ) + dx + parentX,
+                      y: ( (distanceToAdd * dy) / edgeLength ) + dy + parentY
                   };
 
                   options.centralNode._private.position = newPosition;
@@ -20747,8 +20747,7 @@ var cytoscape;
 
           return this; // chaining
       }
-    }
-    ;
+    };
 
     $$('layout', 'circle', CircleLayout);
 
